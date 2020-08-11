@@ -1251,10 +1251,27 @@ static int write_audio_frame(struct gdf_request *req, void *data, int len)
 	struct gdf_config *cfg;
 	int signal_end_of_speech = 0;
 
+#ifndef ASTERISK_13_OR_LATER
+	//for asterisk 12 or earlier SLIN format is used
+
 	datasamples = len / sizeof(short); /* 2 bytes per sample for slin */;
 	datams = datasamples / 8; /* 8 samples per millisecond */;
 	mulaw_len = datasamples * sizeof(char);
 	mulaw = alloca(mulaw_len);
+	for (i = 0; i < datasamples; i++) {
+		mulaw[i] = AST_LIN2MU(((short *)data)[i]);
+	}
+#else
+	//for asterisk 13 or later ULAW format is used
+	
+	datasamples = len; 
+	datams = datasamples / 8; /* 8 samples per millisecond */;
+	mulaw_len = datasamples * sizeof(char);
+	mulaw = alloca(mulaw_len);
+	for (i = 0; i < datasamples; i++) {
+		mulaw[i] = ((char*)data)[i];
+	}
+#endif
 
 	ao2_lock(req);
 #ifdef RES_SPEECH_GDFE_DEBUG_VAD
@@ -1395,10 +1412,6 @@ static int write_audio_frame(struct gdf_request *req, void *data, int len)
 		ao2_lock(req);
 		req->last_audio_duration_ms = 0;
 		ao2_unlock(req);
-	}
-
-	for (i = 0; i < datasamples; i++) {
-		mulaw[i] = AST_LIN2MU(((short *)data)[i]);
 	}
 	
 	maybe_record_audio(req, mulaw, mulaw_len, vad_state);
